@@ -24,7 +24,14 @@ public sealed class BatchProcessor
         if (maxDegreeOfParallelism < 1)
             throw new ArgumentOutOfRangeException(nameof(maxDegreeOfParallelism));
 
+        var jobSizes = jobs.ToDictionary(
+            job => Path.GetFullPath(job.InputPath),
+            job => new FileInfo(job.InputPath).Length,
+            StringComparer.OrdinalIgnoreCase);
+        var processedByFile = new System.Collections.Concurrent.ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        var totalBytes = jobSizes.Values.Sum();
         var results = new System.Collections.Concurrent.ConcurrentBag<FileProcessingResult>();
+
         await Parallel.ForEachAsync(
             jobs,
             new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism, CancellationToken = cancellationToken },
@@ -33,7 +40,8 @@ public sealed class BatchProcessor
                 try
                 {
                     var output = string.IsNullOrWhiteSpace(job.OutputPath)
-                        ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(job.InputPath)) ?? string.Empty,
+                        ? Path.Combine(
+                            Path.GetDirectoryName(Path.GetFullPath(job.InputPath)) ?? string.Empty,
                             FileNameTemplate.Build(job.InputPath, options))
                         : job.OutputPath;
 
@@ -41,15 +49,27 @@ public sealed class BatchProcessor
                     var outputFull = Path.GetFullPath(output);
                     var same = string.Equals(inputFull, outputFull, StringComparison.OrdinalIgnoreCase);
 
+                    var fileProgress = new Progress<TextProcessingProgress>(value =>
+                    {
+                        processedByFile[value.FilePath] = value.ProcessedBytes;
+                        var processedTotal = processedByFile.Values.Sum();
+                        progress?.Report(new TextProcessingProgress(
+                            value.FilePath,
+                            processedTotal,
+                            totalBytes,
+                            processedTotal / Math.Max(1d, value.ProcessedBytes == 0 ? 1d : value.ProcessedBytes / Math.Max(value.SpeedBytesPerSecond, 0.001))));
+                    });
+
                     await _fileProcessor.ProcessAsync(
                         job.InputPath,
                         output,
                         new LengthBasedRemovalStrategy(options),
                         job.Encoding,
                         token,
-                        progress,
+                        fileProgress,
                         same);
 
+                    processedByFile[inputFull] = jobSizes[inputFull];
                     results.Add(new FileProcessingResult(job.InputPath, output, true, null));
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
