@@ -30,6 +30,7 @@ public sealed class BatchProcessor
             StringComparer.OrdinalIgnoreCase);
         var processedByFile = new System.Collections.Concurrent.ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         var totalBytes = jobSizes.Values.Sum();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var results = new System.Collections.Concurrent.ConcurrentBag<FileProcessingResult>();
 
         await Parallel.ForEachAsync(
@@ -57,7 +58,7 @@ public sealed class BatchProcessor
                             value.FilePath,
                             processedTotal,
                             totalBytes,
-                            processedTotal / Math.Max(1d, value.ProcessedBytes == 0 ? 1d : value.ProcessedBytes / Math.Max(value.SpeedBytesPerSecond, 0.001))));
+                            processedTotal / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001)));
                     });
 
                     await _fileProcessor.ProcessAsync(
