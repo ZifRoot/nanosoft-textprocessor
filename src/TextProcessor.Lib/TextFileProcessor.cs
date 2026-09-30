@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 
 namespace TextProcessor.Lib;
 
@@ -47,33 +46,21 @@ public sealed class TextFileProcessor
             using var reader = new StreamReader(input, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: BufferSize, leaveOpen: true);
             await using var writer = new StreamWriter(output, encoding, BufferSize, leaveOpen: true);
 
-            var buffer = new char[BufferSize];
-
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
-                if (count == 0)
+                var line = await reader.ReadLineAsync(cancellationToken);
+                if (line is null)
                     break;
 
-                // StreamReader может разделить слово между двумя чтениями, поэтому
-                // обработка выполняется по строкам в пределах каждого прочитанного блока.
-                // Для обычного текстового файла граница строки является границей слова.
-                var chunk = new string(buffer, 0, count);
-                var lines = chunk.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
-                for (var index = 0; index < lines.Length; index++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await writer.WriteAsync(strategy.Process(lines[index]));
-                    if (index < lines.Length - 1)
-                        await writer.WriteAsync(Environment.NewLine);
-                }
+                await writer.WriteAsync(strategy.Process(line));
+
+                if (!reader.EndOfStream)
+                    await writer.WriteLineAsync();
 
                 var processed = Math.Min(input.Position, totalBytes);
                 progress?.Report(new TextProcessingProgress(
-                    inputPath,
-                    processed,
-                    totalBytes,
+                    inputPath, processed, totalBytes,
                     processed / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001)));
             }
 
