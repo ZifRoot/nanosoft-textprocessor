@@ -25,7 +25,7 @@
     <GroupBox Header="Параметры обработки" Grid.Row="1" Margin="0,0,0,8">
       <Grid Margin="8">
         <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="220"/><ColumnDefinition Width="180"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
-        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
         <TextBlock Text="Минимальная длина:" VerticalAlignment="Center"/><TextBox Grid.Column="1" Text="{Binding MinWordLength}" Margin="3"/>
         <CheckBox Grid.Column="2" Content="Удалять пунктуацию" IsChecked="{Binding RemovePunctuation}" VerticalAlignment="Center"/>
         <ComboBox Grid.Column="3" ItemsSource="{Binding PunctuationModes}" SelectedItem="{Binding PunctuationHandling}" Margin="3"/>
