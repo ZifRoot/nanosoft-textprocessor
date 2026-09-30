@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 
 namespace TextProcessor.Lib;
@@ -37,7 +38,7 @@ public sealed class TextFileProcessor
         var targetPath = sameFile ? CreateTemporaryPath(outputFullPath) : outputFullPath;
         var encoding = EncodingResolver.Resolve(encodingKind, inputFullPath);
         var totalBytes = new FileInfo(inputFullPath).Length;
-        var started = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -47,6 +48,7 @@ public sealed class TextFileProcessor
             await using var writer = new StreamWriter(output, encoding, BufferSize, leaveOpen: true);
 
             var buffer = new char[BufferSize];
+
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -54,22 +56,31 @@ public sealed class TextFileProcessor
                 if (count == 0)
                     break;
 
+                // StreamReader может разделить слово между двумя чтениями, поэтому
+                // обработка выполняется по строкам в пределах каждого прочитанного блока.
+                // Для обычного текстового файла граница строки является границей слова.
                 var chunk = new string(buffer, 0, count);
-                await writer.WriteAsync(strategy.Process(chunk));
-                var processed = input.Position;
+                var lines = chunk.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+                for (var index = 0; index < lines.Length; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await writer.WriteAsync(strategy.Process(lines[index]));
+                    if (index < lines.Length - 1)
+                        await writer.WriteAsync(Environment.NewLine);
+                }
+
+                var processed = Math.Min(input.Position, totalBytes);
                 progress?.Report(new TextProcessingProgress(
                     inputPath,
-                    Math.Min(processed, totalBytes),
+                    processed,
                     totalBytes,
-                    Math.Min(processed, totalBytes) / Math.Max(started.Elapsed.TotalSeconds, 0.001)));
+                    processed / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001)));
             }
 
             await writer.FlushAsync(cancellationToken);
 
             if (sameFile)
-            {
                 File.Move(targetPath, outputFullPath, overwrite: true);
-            }
         }
         catch
         {
@@ -81,6 +92,4 @@ public sealed class TextFileProcessor
 
     private static string CreateTemporaryPath(string outputPath) =>
         outputPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
-
-    private static System.Diagnostics.Stopwatch Stopwatch => System.Diagnostics.Stopwatch.StartNew();
 }
