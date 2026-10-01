@@ -17,7 +17,7 @@ public sealed class TextFileProcessorTests
             await new TextFileProcessor().ProcessAsync(input, output,
                 new LengthBasedRemovalStrategy(new TextProcessingOptions { MinWordLength = 4 }));
 
-            Assert.Equal(Environment.NewLine + "four five six", await File.ReadAllTextAsync(output));
+            Assert.Equal("three" + Environment.NewLine + "four five six", await File.ReadAllTextAsync(output));
         }
         finally { directory.Delete(true); }
     }
