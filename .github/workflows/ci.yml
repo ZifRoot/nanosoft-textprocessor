@@ -7,19 +7,41 @@ on:
     branches: [ master ]
 
 jobs:
-  build-and-test:
+  unit-tests:
+    name: Unit tests
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Restore
-        run: dotnet restore TextProcessor.sln
-      - name: Build
-        run: dotnet build TextProcessor.sln --configuration Release --no-restore
-      - name: Test
-        run: dotnet test TextProcessor.sln --configuration Release --no-build
+
+      - name: Restore unit tests
+        run: dotnet restore tests/TextProcessor.UnitTests/TextProcessor.UnitTests.csproj
+
+      - name: Run unit tests
+        run: dotnet test tests/TextProcessor.UnitTests/TextProcessor.UnitTests.csproj --configuration Release --no-restore
+
+  integration-tests:
+    name: Integration tests
+    needs: unit-tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore integration tests
+        run: dotnet restore tests/TextProcessor.IntegrationTests/TextProcessor.IntegrationTests.csproj
+
+      - name: Run integration tests
+        run: dotnet test tests/TextProcessor.IntegrationTests/TextProcessor.IntegrationTests.csproj --configuration Release --no-restore
