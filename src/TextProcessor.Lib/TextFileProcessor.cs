@@ -41,30 +41,31 @@ public sealed class TextFileProcessor
 
         try
         {
-            await using var input = new FileStream(inputFullPath, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
-            await using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, useAsync: true);
-            using var reader = new StreamReader(input, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: BufferSize, leaveOpen: true);
-            await using var writer = new StreamWriter(output, encoding, BufferSize, leaveOpen: true);
-
-            while (true)
+            await using (var input = new FileStream(inputFullPath, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true))
+            await using (var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, useAsync: true))
+            using (var reader = new StreamReader(input, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: BufferSize, leaveOpen: true))
+            await using (var writer = new StreamWriter(output, encoding, BufferSize, leaveOpen: true))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var line = await reader.ReadLineAsync(cancellationToken);
-                if (line is null)
-                    break;
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var line = await reader.ReadLineAsync(cancellationToken);
+                    if (line is null)
+                        break;
 
-                await writer.WriteAsync(strategy.Process(line));
+                    await writer.WriteAsync(strategy.Process(line));
 
-                if (!reader.EndOfStream)
-                    await writer.WriteLineAsync();
+                    if (!reader.EndOfStream)
+                        await writer.WriteLineAsync();
 
-                var processed = Math.Min(input.Position, totalBytes);
-                progress?.Report(new TextProcessingProgress(
-                    inputPath, processed, totalBytes,
-                    processed / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001)));
+                    var processed = Math.Min(input.Position, totalBytes);
+                    progress?.Report(new TextProcessingProgress(
+                        inputPath, processed, totalBytes,
+                        processed / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001)));
+                }
+
+                await writer.FlushAsync(cancellationToken);
             }
-
-            await writer.FlushAsync(cancellationToken);
 
             if (sameFile)
                 File.Move(targetPath, outputFullPath, overwrite: true);
