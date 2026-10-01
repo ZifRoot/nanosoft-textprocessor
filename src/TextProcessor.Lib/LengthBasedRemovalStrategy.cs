@@ -22,11 +22,12 @@ public sealed class LengthBasedRemovalStrategy : ITextProcessingStrategy
 
         void AppendPendingWhitespace()
         {
-            if (pendingWhitespace)
+            if (pendingWhitespace && output.Length > 0 && output[^1] is not '\r' and not '\n')
             {
                 output.Append(' ');
-                pendingWhitespace = false;
             }
+
+            pendingWhitespace = false;
         }
 
         void FlushWord()
@@ -66,6 +67,22 @@ public sealed class LengthBasedRemovalStrategy : ITextProcessingStrategy
 
             if (char.IsWhiteSpace(current))
             {
+                if (_options.PreserveLineBreaks && current is '\r' or '\n')
+                {
+                    pendingWhitespace = false;
+
+                    if (output.Length > 0 && output[^1] is not '\r' and not '\n')
+                    {
+                        output.Append(current);
+                    }
+                    else if (output.Length > 0 && current == '\n' && output[^1] == '\r')
+                    {
+                        output.Append(current);
+                    }
+
+                    continue;
+                }
+
                 pendingWhitespace = true;
                 continue;
             }
