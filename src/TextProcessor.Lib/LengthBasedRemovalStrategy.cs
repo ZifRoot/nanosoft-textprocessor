@@ -18,11 +18,25 @@ public sealed class LengthBasedRemovalStrategy : ITextProcessingStrategy
         ArgumentNullException.ThrowIfNull(input);
         var output = new StringBuilder(input.Length);
         var word = new StringBuilder();
+        var pendingWhitespace = false;
+
+        void AppendPendingWhitespace()
+        {
+            if (pendingWhitespace)
+            {
+                output.Append(' ');
+                pendingWhitespace = false;
+            }
+        }
 
         void FlushWord()
         {
             if (word.Length >= _options.MinWordLength)
+            {
+                AppendPendingWhitespace();
                 output.Append(word);
+            }
+
             word.Clear();
         }
 
@@ -44,7 +58,7 @@ public sealed class LengthBasedRemovalStrategy : ITextProcessingStrategy
                     (_options.PunctuationHandling == PunctuationHandling.SmartReplace &&
                      HasWordCharacterBefore(input, index) && HasWordCharacterAfter(input, index)))
                 {
-                    output.Append(' ');
+                    pendingWhitespace = true;
                 }
 
                 continue;
@@ -52,10 +66,11 @@ public sealed class LengthBasedRemovalStrategy : ITextProcessingStrategy
 
             if (char.IsWhiteSpace(current))
             {
-                output.Append(current);
+                pendingWhitespace = true;
                 continue;
             }
 
+            AppendPendingWhitespace();
             output.Append(current);
         }
 
